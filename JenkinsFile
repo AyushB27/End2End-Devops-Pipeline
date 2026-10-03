@@ -1,0 +1,62 @@
+pipeline {
+    agent any
+
+    environment {
+        APP_IMAGE_NAME = 'devops-node-app'
+        CONTAINER_NAME = 'devops-node-container'
+        HOST_PORT      = '3000'
+        CONTAINER_PORT = '3000'
+    }
+
+    stages {
+        stage('Checkout SCM') {
+            steps {
+                echo 'Checking out source code from Git repository...'
+                checkout scm
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                echo 'Building Docker container image...'
+                sh 'docker build -t ${APP_IMAGE_NAME}:${BUILD_NUMBER} -t ${APP_IMAGE_NAME}:latest .'
+            }
+        }
+
+        stage('Test & Validation') {
+            steps {
+                echo 'Executing container smoke tests...'
+                sh 'docker run --rm ${APP_IMAGE_NAME}:latest node -v'
+            }
+        }
+
+        stage('Deploy to Localhost') {
+            steps {
+                echo 'Stopping and removing pre-existing container if running...'
+                sh '''
+                    if [ $(docker ps -a -q -f name=^/${CONTAINER_NAME}$) ]; then
+                        docker stop ${CONTAINER_NAME}
+                        docker rm -f ${CONTAINER_NAME}
+                    fi
+                '''
+                echo 'Deploying fresh container instance on localhost...'
+                sh '''
+                    docker run -d \
+                        --name ${CONTAINER_NAME} \
+                        -p ${HOST_PORT}:${CONTAINER_PORT} \
+                        --restart unless-stopped \
+                        ${APP_IMAGE_NAME}:latest
+                '''
+            }
+        }
+    }
+
+    post {
+        success {
+            echo "CI/CD Pipeline executed successfully! Application is live at http://localhost:${HOST_PORT}"
+        }
+        failure {
+            echo "Pipeline execution failed. Check Jenkins console output for root cause."
+        }
+    }
+}

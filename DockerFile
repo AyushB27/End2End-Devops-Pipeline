@@ -1,0 +1,18 @@
+# Stage 1: Base Runtime Environment
+FROM node:18-alpine
+
+# Set working directory inside container
+WORKDIR /usr/src/app
+
+# Install app dependencies
+COPY package*.json ./
+RUN npm install --only=production
+
+# Bundle app source code
+COPY . .
+
+# Expose internal service port
+EXPOSE 3000
+
+# Execute server application
+CMD ["npm", "start"]
